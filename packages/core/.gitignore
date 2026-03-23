@@ -1,0 +1,8 @@
+# Build outputs
+dist/
+
+# Node modules (optional since root ignores them)
+node_modules/
+
+# Logs
+*.log

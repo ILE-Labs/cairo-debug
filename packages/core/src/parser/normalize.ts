@@ -1,0 +1,6 @@
+export function normalizeError(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}

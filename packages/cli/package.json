@@ -1,0 +1,16 @@
+{
+  "name": "@cairo-debug/cli",
+  "version": "0.0.1",
+  "bin": {
+    "cairo-debug": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "pnpm build && node src/index.ts",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@cairo-debug/core": "workspace:*",
+    "chalk": "^5.0.0"
+  }
+}

@@ -1,0 +1,11 @@
+# Build outputs
+dist/
+
+# Node modules
+node_modules/
+
+# Logs
+*.log
+
+# Temporary CLI files
+*.tsbuildinfo
