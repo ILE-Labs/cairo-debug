@@ -1,14 +1,25 @@
 export const sampleErrors = [
   {
-    pattern: /mismatched types expected felt252 found u32/i,
-    title: "Type Mismatch Error",
-    explanation: "Cairo requires strict type matching. You provided a u32 where a felt252 was expected.",
-    fix: "Check your variable or function types. Convert u32 to felt252 if needed."
+    id: 1,
+    category: "SyscallResultTrait mismatch",
+    example_error: "Trait not implemented for return type",
+    why_cairo_specific:
+      "Cairo separates syscall returns from regular returns — different unwrap methods",
+    severity: "HIGH",
+    concrete_fix:
+      "Implement the required trait or use the correct unwrap method for syscall results.",
+    code_example:
+      "let result = my_syscall().unwrap(); // Use proper unwrap for syscall",
   },
   {
-    pattern: /undefined variable '(\w+)'/i,
-    title: "Undefined Variable",
-    explanation: "You used a variable that has not been declared or is out of scope.",
-    fix: "Declare the variable before using it, or check your scope."
-  }
+    id: 2,
+    category: "Missing #[abi(embed_v0)]",
+    example_error: "Function not exposed as external entrypoint",
+    why_cairo_specific:
+      "Cairo requires explicit ABI embedding unlike Solidity's public keyword",
+    severity: "HIGH",
+    concrete_fix:
+      "Add #[abi(embed_v0)] above your function to expose it externally",
+    code_example: "#[abi(embed_v0)]\nfunc my_func() { ... }",
+  },
 ];
