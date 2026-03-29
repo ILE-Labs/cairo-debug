@@ -17,6 +17,16 @@ async function readStdin() {
         process.stdin.on("end", () => resolve(data.trim()));
     });
 }
+function fallbackExplanation(error) {
+    return {
+        category: "Unknown Cairo error",
+        severity: "UNKNOWN",
+        what_happened: "This error is not yet recognized by cairo-debug.",
+        why_cairo_specific: "Cairo compiler errors can vary across versions and patterns. This one is not yet in the knowledge base.",
+        fix: "Review the raw error message and consult Cairo documentation or add this pattern to the knowledge base.",
+        example: error.slice(0, 200),
+    };
+}
 function extractErrors(raw) {
     const lines = raw.split("\n");
     const errors = [];
@@ -47,19 +57,38 @@ function extractLocation(errorBlock) {
         column: Number(match[3]),
     };
 }
+function getErrorKey(errorBlock) {
+    const codeMatch = errorBlock.match(/error\[(E\d+)\]/);
+    const messageMatch = errorBlock.match(/error\[E\d+\]: (.*)/);
+    const code = codeMatch?.[1] || "UNKNOWN";
+    const message = messageMatch?.[1]?.toLowerCase().trim() || "";
+    return `${code}:${message}`;
+}
+function groupErrors(errors) {
+    const map = new Map();
+    for (const err of errors) {
+        const key = getErrorKey(err);
+        if (!map.has(key)) {
+            map.set(key, []);
+        }
+        map.get(key).push(err);
+    }
+    return map;
+}
 function printPretty(result, index) {
-    console.log(chalk_1.default.gray("\n> cairo-debug v1.0.0 | ILE Labs\n"));
     if (index !== undefined) {
         console.log(chalk_1.default.yellow(`Error ${index + 1}`));
     }
-    const location = result.location
-        ? `${result.location.file.split("/").pop()}:${result.location.line}`
-        : "unknown location";
-    console.log(chalk_1.default.red.bold(`[ERROR] ${result.category} -- ${location} (${result.severity})`));
-    console.log(chalk_1.default.white(`\nWhat happened:\n ${result.what_happened}`));
-    console.log(chalk_1.default.white(`\nWhy this happens in Cairo:\n ${result.why_cairo_specific}`));
-    console.log(chalk_1.default.green(`\nFix:\n ${result.fix}`));
-    console.log(chalk_1.default.blue(`\nExample:\n ${result.example}`));
+    const locationPreview = result.locations
+        .slice(0, 2)
+        .map((l) => `${l.file.split("/").pop()}:${l.line}`)
+        .join(", ");
+    console.log(chalk_1.default.red.bold(`[ERROR] ${result.explanation.category} (${result.occurrences} occurrences)`));
+    console.log(chalk_1.default.gray(`Locations: ${locationPreview}`));
+    console.log(chalk_1.default.white(`\nWhat happened:\n ${result.explanation.what_happened}`));
+    console.log(chalk_1.default.white(`\nWhy this happens in Cairo:\n ${result.explanation.why_cairo_specific}`));
+    console.log(chalk_1.default.green(`\nFix:\n ${result.explanation.fix}`));
+    console.log(chalk_1.default.gray("\n----------------------------------------\n"));
 }
 function printHelp() {
     console.log(`
@@ -99,18 +128,16 @@ async function handleExplain(args) {
         console.log(chalk_1.default.yellow("No Cairo errors detected."));
         return;
     }
-    const results = extractedErrors
-        .map((err) => {
-        const explanation = (0, core_1.explainError)(err);
-        const location = extractLocation(err);
-        if (!explanation)
-            return null;
+    const grouped = groupErrors(extractedErrors);
+    const results = Array.from(grouped.entries()).map(([key, group]) => {
+        const explanation = (0, core_1.explainError)(group[0]) || fallbackExplanation(group[0]);
+        const locations = group.map((err) => extractLocation(err)).filter(Boolean);
         return {
-            ...explanation,
-            location,
+            explanation,
+            occurrences: group.length,
+            locations,
         };
-    })
-        .filter(Boolean);
+    });
     if (results.length === 0) {
         console.log(chalk_1.default.yellow("No matching Cairo error patterns found."));
         return;
@@ -119,6 +146,7 @@ async function handleExplain(args) {
         console.log(JSON.stringify(results, null, 2));
     }
     else {
+        console.log(chalk_1.default.gray("\n> cairo-debug v1.0.0 | ILE Labs\n"));
         results.forEach((result, index) => printPretty(result, index));
     }
 }

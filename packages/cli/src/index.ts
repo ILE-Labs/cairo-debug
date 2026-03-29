@@ -15,6 +15,18 @@ async function readStdin(): Promise<string | null> {
   });
 }
 
+function fallbackExplanation(error: string) {
+  return {
+    category: "Unknown Cairo error",
+    severity: "UNKNOWN",
+    what_happened: "This error is not yet recognized by cairo-debug.",
+    why_cairo_specific:
+      "Cairo compiler errors can vary across versions and patterns. This one is not yet in the knowledge base.",
+    fix: "Review the raw error message and consult Cairo documentation or add this pattern to the knowledge base.",
+    example: error.slice(0, 200),
+  };
+}
+
 function extractErrors(raw: string): string[] {
   const lines = raw.split("\n");
 
@@ -53,31 +65,63 @@ function extractLocation(errorBlock: string) {
   };
 }
 
-function printPretty(result: any, index?: number) {
-  console.log(chalk.gray("\n> cairo-debug v1.0.0 | ILE Labs\n"));
+function getErrorKey(errorBlock: string) {
+  const codeMatch = errorBlock.match(/error\[(E\d+)\]/);
+  const messageMatch = errorBlock.match(/error\[E\d+\]: (.*)/);
 
+  const code = codeMatch?.[1] || "UNKNOWN";
+  const message = messageMatch?.[1]?.toLowerCase().trim() || "";
+
+  return `${code}:${message}`;
+}
+
+function groupErrors(errors: string[]) {
+  const map = new Map<string, string[]>();
+
+  for (const err of errors) {
+    const key = getErrorKey(err);
+
+    if (!map.has(key)) {
+      map.set(key, []);
+    }
+
+    map.get(key)!.push(err);
+  }
+
+  return map;
+}
+
+function printPretty(result: any, index?: number) {
   if (index !== undefined) {
     console.log(chalk.yellow(`Error ${index + 1}`));
   }
 
-  const location = result.location
-    ? `${result.location.file.split("/").pop()}:${result.location.line}`
-    : "unknown location";
+  const locationPreview = result.locations
+    .slice(0, 2)
+    .map((l: any) => `${l.file.split("/").pop()}:${l.line}`)
+    .join(", ");
+
   console.log(
     chalk.red.bold(
-      `[ERROR] ${result.category} -- ${location} (${result.severity})`,
+      `[ERROR] ${result.explanation.category} (${result.occurrences} occurrences)`,
     ),
   );
 
-  console.log(chalk.white(`\nWhat happened:\n ${result.what_happened}`));
+  console.log(chalk.gray(`Locations: ${locationPreview}`));
 
   console.log(
-    chalk.white(`\nWhy this happens in Cairo:\n ${result.why_cairo_specific}`),
+    chalk.white(`\nWhat happened:\n ${result.explanation.what_happened}`),
   );
 
-  console.log(chalk.green(`\nFix:\n ${result.fix}`));
+  console.log(
+    chalk.white(
+      `\nWhy this happens in Cairo:\n ${result.explanation.why_cairo_specific}`,
+    ),
+  );
 
-  console.log(chalk.blue(`\nExample:\n ${result.example}`));
+  console.log(chalk.green(`\nFix:\n ${result.explanation.fix}`));
+
+  console.log(chalk.gray("\n----------------------------------------\n"));
 }
 
 function printHelp() {
@@ -127,19 +171,18 @@ async function handleExplain(args: string[]) {
     return;
   }
 
-  const results = extractedErrors
-    .map((err) => {
-      const explanation = explainError(err);
-      const location = extractLocation(err);
+  const grouped = groupErrors(extractedErrors);
 
-      if (!explanation) return null;
+  const results = Array.from(grouped.entries()).map(([key, group]) => {
+    const explanation = explainError(group[0]) || fallbackExplanation(group[0]);
+    const locations = group.map((err) => extractLocation(err)).filter(Boolean);
 
-      return {
-        ...explanation,
-        location,
-      };
-    })
-    .filter(Boolean);
+    return {
+      explanation,
+      occurrences: group.length,
+      locations,
+    };
+  });
 
   if (results.length === 0) {
     console.log(chalk.yellow("No matching Cairo error patterns found."));
@@ -149,6 +192,7 @@ async function handleExplain(args: string[]) {
   if (isJson) {
     console.log(JSON.stringify(results, null, 2));
   } else {
+    console.log(chalk.gray("\n> cairo-debug v1.0.0 | ILE Labs\n"));
     results.forEach((result, index) => printPretty(result, index));
   }
 }
