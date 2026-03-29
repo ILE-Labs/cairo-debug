@@ -17,9 +17,10 @@ mod HelloStarknet {
     impl HelloStarknetImpl of super::IHelloStarknet<ContractState> {
 
         fn increase_balance(ref self: ContractState, amount: felt252) {
-            let x = unknown_function(amount); 
+            let big: felt252 = 2 ** 251;
+            let overflowed = big * big;
 
-            self.balance.write(x);
+            self.balance.write(overflowed + amount);
         }
 
         fn get_balance(self: @ContractState) -> felt252 {
