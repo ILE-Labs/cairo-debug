@@ -3,6 +3,26 @@
 import { explainError } from "@cairo-debug/core";
 import chalk from "chalk";
 import fs from "node:fs";
+import { execSync } from "node:child_process";
+import path from "node:path";
+
+function isCairoFile(file: string) {
+  return file.endsWith(".cairo");
+}
+
+function runScarbFromFile(file: string): string {
+  const projectRoot = path.dirname(file);
+
+  try {
+    execSync("scarb build", {
+      cwd: projectRoot,
+      stdio: "pipe",
+    });
+    return "";
+  } catch (err: any) {
+    return err.stderr?.toString() || err.stdout?.toString() || "";
+  }
+}
 
 // Reads piped input (scarb build output)
 async function readStdin(): Promise<string | null> {
@@ -150,7 +170,13 @@ async function handleExplain(args: string[]) {
   if (stdin) {
     input = stdin;
   } else if (cleanArgs[0] && fs.existsSync(cleanArgs[0])) {
-    input = fs.readFileSync(cleanArgs[0], "utf-8");
+    const file = cleanArgs[0];
+
+    if (isCairoFile(file)) {
+      input = runScarbFromFile(file);
+    } else {
+      input = fs.readFileSync(cleanArgs[0], "utf-8");
+    }
   } else if (cleanArgs.length > 0) {
     input = cleanArgs.join(" ");
   }

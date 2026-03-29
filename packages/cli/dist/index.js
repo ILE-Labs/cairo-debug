@@ -7,6 +7,24 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const core_1 = require("@cairo-debug/core");
 const chalk_1 = __importDefault(require("chalk"));
 const node_fs_1 = __importDefault(require("node:fs"));
+const node_child_process_1 = require("node:child_process");
+const node_path_1 = __importDefault(require("node:path"));
+function isCairoFile(file) {
+    return file.endsWith(".cairo");
+}
+function runScarbFromFile(file) {
+    const projectRoot = node_path_1.default.dirname(file);
+    try {
+        (0, node_child_process_1.execSync)("scarb build", {
+            cwd: projectRoot,
+            stdio: "pipe",
+        });
+        return "";
+    }
+    catch (err) {
+        return err.stderr?.toString() || err.stdout?.toString() || "";
+    }
+}
 // Reads piped input (scarb build output)
 async function readStdin() {
     if (process.stdin.isTTY)
@@ -114,7 +132,13 @@ async function handleExplain(args) {
         input = stdin;
     }
     else if (cleanArgs[0] && node_fs_1.default.existsSync(cleanArgs[0])) {
-        input = node_fs_1.default.readFileSync(cleanArgs[0], "utf-8");
+        const file = cleanArgs[0];
+        if (isCairoFile(file)) {
+            input = runScarbFromFile(file);
+        }
+        else {
+            input = node_fs_1.default.readFileSync(cleanArgs[0], "utf-8");
+        }
     }
     else if (cleanArgs.length > 0) {
         input = cleanArgs.join(" ");
