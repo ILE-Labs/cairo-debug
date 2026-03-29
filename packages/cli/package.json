@@ -1,6 +1,7 @@
 {
   "name": "@cairo-debug/cli",
   "version": "0.0.1",
+  "type": "module",
   "bin": {
     "cairo-debug": "dist/index.js"
   },

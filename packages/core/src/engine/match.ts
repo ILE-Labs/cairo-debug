@@ -1,6 +1,7 @@
 import { patterns } from "../patterns";
 import { normalizeError } from "../parser/normalize";
 import { scorePattern } from "./score";
+import chalk from "chalk";
 
 export function explainError(raw: string) {
   const input = normalizeError(raw);
